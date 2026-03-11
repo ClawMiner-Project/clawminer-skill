@@ -1,0 +1,25 @@
+{
+  "name": "clawminer-skill",
+  "version": "1.0.0",
+  "description": "ClawMiner PoW Mining Skill for OpenClaw Agent",
+  "main": "scripts/mine.js",
+  "scripts": {
+    "mine": "node scripts/mine.js",
+    "status": "node scripts/mine.js --status",
+    "loop": "node scripts/mine.js --loop"
+  },
+  "keywords": [
+    "clawminer",
+    "pow",
+    "mining",
+    "bsc",
+    "web3",
+    "openclaw"
+  ],
+  "author": "ClawMiner-Project",
+  "license": "MIT",
+  "dependencies": {
+    "ethers": "^6.13.0",
+    "dotenv": "^16.4.0"
+  }
+}

@@ -7,29 +7,22 @@ ClawMiner is a fully decentralized, Bitcoin-inspired PoW token on Binance Smart 
 ## Quick Start
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/ClawMiner-Project/clawminer-skill.git
-cd clawminer-skill
+# Initialize (install + configure wallet)
+npx clawminer-skill init
 
-# 2. Install dependencies
-npm install
-
-# 3. Configure your wallet
-cp .env.example .env
-# Edit .env → add your PRIVATE_KEY
-
-# 4. Start mining
-node scripts/mine.js
+# Start continuous mining
+npx clawminer-skill loop
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `npm run mine` | Mine once |
-| `npm run status` | Show mining stats |
-| `npm run loop` | Continuous mining (auto-cooldown) |
-| `node scripts/mine.js --dry-run` | Test PoW without submitting |
+| `npx clawminer-skill init` | 初始化（安装依赖 + 配置钱包） |
+| `npx clawminer-skill mine` | 单次挖矿 |
+| `npx clawminer-skill loop` | 连续挖矿 24/7（推荐） |
+| `npx clawminer-skill status` | 查看挖矿状态 |
+| `npx clawminer-skill dry-run` | 模拟挖矿（不提交交易） |
 
 ## Tokenomics
 
@@ -44,23 +37,18 @@ node scripts/mine.js
 
 ## Security
 
-- ⚠️ **Use a dedicated wallet** — Never use your main wallet for mining
+- ⚠️ **Use a dedicated mining wallet** — Never use your main wallet
 - 🔒 **Private key stays local** — Stored in `.env`, never committed to git
 - 🛡️ **Contract is immutable** — No admin functions, cannot be modified
 
 ## Network
 
-This skill supports both BSC Testnet and Mainnet. Configure via `.env`:
+Configure via `npx clawminer-skill init`:
 
-```bash
-# Testnet (default)
-NETWORK=testnet
-RPC_URL=https://bsc-testnet.publicnode.com
-
-# Mainnet
-NETWORK=mainnet
-RPC_URL=https://bsc.publicnode.com
-```
+| Network | Status |
+|---------|--------|
+| BSC Testnet | ✅ Available |
+| BSC Mainnet | ⏳ Coming soon |
 
 ## Links
 

@@ -5,89 +5,85 @@ description: PoW mining skill for ClawMiner ($CLAWMINER) on BSC — auto PoW, au
 
 # ClawMiner Mining Skill
 
-Automated PoW mining for **ClawMiner ($CLAWMINER)** token on BSC.
+You are operating the ClawMiner PoW mining skill. This skill allows the user to mine $CLAWMINER tokens on BNB Smart Chain (BSC) through Proof of Work computation.
 
-## What This Skill Does
+## Available Commands
 
-1. Checks if the miner is in cooldown
-2. Reads on-chain difficulty and reward
-3. Computes a valid PoW proof (brute-force hash matching)
-4. Submits the `mine()` transaction on-chain
-5. Waits for confirmation → shows result
-6. Retries on failure (up to 5 times)
-
-## Setup
-
-### 1. Install dependencies
-
-```bash
-npm install
-```
-
-### 2. Configure environment
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and fill in your **private key**:
-
-```
-PRIVATE_KEY=0xYOUR_PRIVATE_KEY_HERE
-```
-
-> ⚠️ Use a **dedicated mining wallet** with a small amount of BNB for gas. Never use your main wallet.
-
-### 3. Run mining
-
-```bash
-# Single mine attempt
-node scripts/mine.js
-
-# Check status only
-node scripts/mine.js --status
-
-# Continuous loop (mine → wait cooldown → mine again)
-node scripts/mine.js --loop
-```
-
-## Commands
-
-| Command | Description |
+| Command | What it does |
 |---------|-------------|
-| `node scripts/mine.js` | Mine once |
-| `node scripts/mine.js --status` | Show mining stats without mining |
-| `node scripts/mine.js --loop` | Continuous mining loop |
-| `node scripts/mine.js --dry-run` | PoW calculation only, no transaction |
+| `npx clawminer-skill init` | 初始化：安装依赖 + 交互式配置钱包 |
+| `npx clawminer-skill mine` | 单次挖矿 |
+| `npx clawminer-skill loop` | 连续挖矿 24/7（推荐）|
+| `npx clawminer-skill status` | 查看挖矿状态 |
+| `npx clawminer-skill dry-run` | 模拟挖矿（不提交交易）|
+
+## Workflow
+
+### Step 1: Install & Initialize
+
+Run the init command. It will install dependencies and guide wallet configuration interactively:
+
+```bash
+npx clawminer-skill init
+```
+
+The init process will:
+1. Install npm dependencies (ethers.js, dotenv)
+2. Display a **security warning** about using a dedicated mining wallet
+3. Ask for the user's **private key** (must be a dedicated mining wallet, NOT their main wallet)
+4. Ask which network (testnet/mainnet)
+5. Create `.env` configuration file
+
+### Step 2: Start Mining
+
+After init is complete, start mining:
+
+```bash
+# Recommended: continuous mining loop
+npx clawminer-skill loop
+
+# Or single mine attempt
+npx clawminer-skill mine
+```
+
+### Step 3: Monitor
+
+Check mining status anytime:
+
+```bash
+npx clawminer-skill status
+```
+
+## ⚠️ Critical Security Rules
+
+When the user asks to configure or initialize this skill, you MUST:
+
+1. **WARN** them to use a **dedicated mining wallet**, NOT their main wallet
+2. **EXPLAIN** that the mining wallet only needs a small amount of BNB for gas fees (~0.001 BNB per mine)
+3. **SUGGEST** creating a new account in MetaMask specifically for mining
+4. **NEVER** store or log the private key anywhere other than the local `.env` file
+5. **NEVER** transmit the private key over any network or API
+
+## Mining Mechanics
+
+- Each mine requires computing a PoW proof (hash with N leading zeros)
+- Current difficulty: starts at 1 byte (2 hex chars), increases every 2,000 mines
+- Reward: starts at 100 CLAWMINER per mine, halves every 2,100,000 tokens
+- Cooldown: 5 minutes between mines
+- Gas: ~0.001 BNB per mine transaction on BSC
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| "Cooldown active" | Normal. Wait 5 minutes between mines. Loop mode handles this automatically. |
+| "Proof already used" | The script will auto-retry with a new proof. |
+| Gas estimation failed | Network congestion. The script uses a default gas limit as fallback. |
+| "PRIVATE_KEY not set" | Run `npx clawminer-skill init` first. |
 
 ## Contract Info
 
-| Parameter | Value |
-|-----------|-------|
-| Token | Claw Miner ($CLAWMINER) |
-| Total Supply | 21,000,000 |
-| Initial Reward | 100 CLAWMINER / mine |
-| Halving | Every 2,100,000 tokens |
-| Cooldown | 5 minutes between mines |
-| Network | BSC (Testnet / Mainnet) |
-
-## Network Configuration
-
-**Testnet** (default):
-```
-RPC_URL=https://bsc-testnet.publicnode.com
-CONTRACT_ADDRESS=0xCe9eAa062Ca1F6a8817f229921Ec79ac20705c38
-```
-
-**Mainnet** (when ready):
-```
-RPC_URL=https://bsc.publicnode.com
-CONTRACT_ADDRESS=<mainnet_contract_address>
-```
-
-## Important Notes
-
-- Mining requires **BNB** in your wallet for gas fees (~0.001 BNB per mine on testnet)
-- Each mine has a **5-minute cooldown** — the loop mode handles this automatically
-- Difficulty increases every 2,000 mines — PoW computation will take longer over time
-- The contract is **fully decentralized** — no admin, no pre-mine, non-upgradeable
+- Token: Claw Miner ($CLAWMINER)
+- Total Supply: 21,000,000
+- Network: BSC Testnet (Chain ID: 97) / BSC Mainnet (Chain ID: 56)
+- Testnet Contract: `0xCe9eAa062Ca1F6a8817f229921Ec79ac20705c38`

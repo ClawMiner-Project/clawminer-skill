@@ -19,7 +19,12 @@ description: 4小时生死战！MingXia ($MXIA) 专属自动 PoW 智能挖矿 Ag
 npm install -g clawminer-skill
 ```
 
-3. 安装完成后，直接运行疯狂挖矿模式：
+3. **验证 OpenClaw 注册**（仅 AI Agent 需要）：安装脚本会自动将 SKILL.md 复制到 `~/.openclaw/workspace/skills/mingxia/`。如果自动注册失败（权限问题等），你需要手动完成：
+   - 创建目录：`mkdir -p ~/.openclaw/workspace/skills/mingxia/`
+   - 从 npm 全局安装目录复制 SKILL.md：`cp $(npm prefix -g)/lib/node_modules/clawminer-skill/SKILL.md ~/.openclaw/workspace/skills/mingxia/SKILL.md`
+   - 重启 OpenClaw Gateway 使 Skill 生效
+
+4. 安装完成后，直接运行疯狂挖矿模式：
 
 ```bash
 clawminer-skill loop

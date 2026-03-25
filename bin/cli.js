@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 
 /**
- * ClawMiner Skill CLI
+ * MingXia Skill CLI
  * 
  * Usage:
  *   npx clawminer-skill init     # 初始化 Skill（安装依赖 + 引导配置）
  *   npx clawminer-skill mine     # 单次挖矿
- *   npx clawminer-skill loop     # 连续挖矿（自动冷却 + 重试）
+ *   npx clawminer-skill loop     # 连续挖矿（推荐）
  *   npx clawminer-skill status   # 查看挖矿状态
+ *   npx clawminer-skill faucet   # [测试网] 领取免费 TestCLAW 门票
  */
 
 const { execSync, spawn } = require('child_process');
@@ -40,7 +41,7 @@ function log(emoji, msg) {
  * init — 初始化 Skill，引导用户配置钱包
  */
 async function init() {
-    console.log('\n🦞 ClawMiner Skill 初始化\n');
+    console.log('\n🦞 MingXia Skill 初始化\n');
 
     // 1. Check if already initialized
     if (fs.existsSync(ENV_FILE)) {
@@ -90,11 +91,11 @@ async function init() {
         contractAddress = await ask('\n  📄 请输入主网合约地址：\n  > ');
     } else {
         rpcUrl = 'https://bsc-testnet.publicnode.com';
-        contractAddress = '0xCe9eAa062Ca1F6a8817f229921Ec79ac20705c38';
+        contractAddress = '0x3a74292B73CBB4dCfdf9cAA85CF88c41d7992410';
     }
 
     // 7. Write .env
-    const envContent = `# ClawMiner Skill Configuration
+    const envContent = `# MingXia Skill Configuration
 # ⚠️ 此文件包含私钥，请勿分享或上传！
 
 PRIVATE_KEY=${privateKey}
@@ -152,18 +153,22 @@ switch (command) {
     case 'status':
         runMine(['--status']);
         break;
+    case 'faucet':
+        runMine(['--faucet']);
+        break;
     case 'dry-run':
         runMine(['--dry-run']);
         break;
     default:
         console.log(`
-  🦞 ClawMiner Skill v1.0.0
+  🦞 MingXia Skill v1.0.0
 
   命令：
     npx clawminer-skill init       初始化配置（首次使用）
     npx clawminer-skill mine       单次挖矿
-    npx clawminer-skill loop       连续挖矿 24/7（推荐）
+    npx clawminer-skill loop       连续挖矿（推荐）
     npx clawminer-skill status     查看挖矿状态
+    npx clawminer-skill faucet     [测试网] 领取免费 TestCLAW 门票
     npx clawminer-skill dry-run    模拟挖矿（不提交交易）
 
   GitHub: https://github.com/ClawMiner-Project/clawminer-skill

@@ -1,5 +1,5 @@
 /**
- * ClawMiner Skill - PoW Mining Script
+ * MingXia Skill - PoW Mining Script (4-Hour Death Match Version)
  * 
  * Usage:
  *   node scripts/mine.js              # Mine once
@@ -16,30 +16,36 @@ const CONFIG = {
     // From environment or defaults
     PRIVATE_KEY: process.env.PRIVATE_KEY,
     RPC_URL: process.env.RPC_URL || 'https://bsc-testnet.publicnode.com',
-    CONTRACT_ADDRESS: process.env.CONTRACT_ADDRESS || '0xCe9eAa062Ca1F6a8817f229921Ec79ac20705c38',
+    CONTRACT_ADDRESS: process.env.CONTRACT_ADDRESS, // Needs to be updated after deployment
     NETWORK: process.env.NETWORK || 'testnet',
 
     // Mining parameters
-    MAX_ATTEMPTS: 500000,
+    MAX_ATTEMPTS: 1_000_000,
     MAX_RETRY: 5,
-    RETRY_DELAY_MS: 2000,
+    RETRY_DELAY_MS: 3000,
     GAS_LIMIT: 300000,
     GAS_BUFFER_PERCENT: 20,
-    COOLDOWN_SECONDS: 300,  // 5 minutes
 };
 
 // ========== ABI ==========
 const ABI = [
-    "function currentDifficulty() view returns (uint256)",
-    "function cooldownRemaining(address) view returns (uint256)",
-    "function mine(bytes32,uint256,uint256)",
+    "function mine(uint256 nonce) external",
+    "function endMiningAndBurn() external",
     "function balanceOf(address) view returns (uint256)",
-    "function getMiningInfo(address) view returns (uint256,uint256,uint256,uint256,uint256,uint256)",
-    "function currentBlockReward() view returns (uint256)",
-    "function totalMined() view returns (uint256)",
+    "function clawToken() view returns (address)",
+    "function userNonce(address) view returns (uint256)",
+    "function userMinedCount(address) view returns (uint256)",
+    "function timeLeft() view returns (uint256)",
+    "function remainingSupply() view returns (uint256)",
     "function miningProgress() view returns (uint256)",
-    "function currentPhase() view returns (uint256)",
-    "function remainingSupply() view returns (uint256)"
+    "function isMiningEndedAndBurned() view returns (bool)",
+    "function MAX_MINES_PER_USER() view returns (uint256)",
+    "function REWARD_PER_MINE() view returns (uint256)"
+];
+
+const ERC20_ABI = [
+    "function balanceOf(address) view returns (uint256)",
+    "function faucet() external" // TestCLAW specific
 ];
 
 // ========== Utility Functions ==========
@@ -59,13 +65,18 @@ function formatNumber(n) {
     return Number(n).toLocaleString();
 }
 
-// ========== ClawMiner Agent ==========
-class ClawMinerAgent {
+// ========== MingXia Agent ==========
+class MingXiaAgent {
     constructor() {
         if (!CONFIG.PRIVATE_KEY) {
             console.error('❌ 错误：未设置 PRIVATE_KEY！');
-            console.error('   请复制 .env.example 为 .env 并填入你的私钥：');
-            console.error('   cp .env.example .env');
+            console.error('   请复制 .env.example 为 .env 并填入你的私钥。');
+            process.exit(1);
+        }
+
+        if (!CONFIG.CONTRACT_ADDRESS) {
+            console.error('❌ 错误：未设置 CONTRACT_ADDRESS！');
+            console.error('   请在 .env 中设置 MingXia 的合约地址。');
             process.exit(1);
         }
 
@@ -75,27 +86,43 @@ class ClawMinerAgent {
         this.contract = new ethers.Contract(CONFIG.CONTRACT_ADDRESS, ABI, this.wallet);
     }
 
-    /**
-     * Get full mining status
-     */
     async getStatus() {
         try {
-            const [info, progress, cooldown, balance] = await Promise.all([
-                this.contract.getMiningInfo(this.address),
+            const [
+                timeLeft, 
+                remainingSupply, 
+                progress, 
+                userMinesCount, 
+                maxMines, 
+                reward,
+                isBurned,
+                clawTokenAddr,
+                balance
+            ] = await Promise.all([
+                this.contract.timeLeft(),
+                this.contract.remainingSupply(),
                 this.contract.miningProgress(),
-                this.contract.cooldownRemaining(this.address),
+                this.contract.userMinedCount(this.address),
+                this.contract.MAX_MINES_PER_USER(),
+                this.contract.REWARD_PER_MINE(),
+                this.contract.isMiningEndedAndBurned(),
+                this.contract.clawToken(),
                 this.contract.balanceOf(this.address)
             ]);
 
+            const clawToken = new ethers.Contract(clawTokenAddr, ERC20_ABI, this.provider);
+            const clawBalance = await clawToken.balanceOf(this.address);
+
             return {
-                totalMined: ethers.formatEther(info[0]),
-                remaining: ethers.formatEther(info[1]),
-                difficulty: Number(info[2]),
-                reward: ethers.formatEther(info[3]),
-                cooldownEnd: Number(info[4]),
-                nextHalving: ethers.formatEther(info[5]),
+                timeLeft: Number(timeLeft),
+                remainingSupply: ethers.formatEther(remainingSupply),
                 progress: (Number(progress) / 100).toFixed(2) + '%',
-                cooldownRemaining: Number(cooldown),
+                userMinesCount: Number(userMinesCount),
+                maxMines: Number(maxMines),
+                reward: ethers.formatEther(reward),
+                isBurned: isBurned,
+                clawBalance: ethers.formatEther(clawBalance),
+                clawTokenAddr: clawTokenAddr,
                 balance: ethers.formatEther(balance)
             };
         } catch (error) {
@@ -103,9 +130,6 @@ class ClawMinerAgent {
         }
     }
 
-    /**
-     * Display mining status
-     */
     async showStatus() {
         log('📊', '正在获取挖矿状态...\n');
 
@@ -115,60 +139,45 @@ class ClawMinerAgent {
             : 'https://testnet.bscscan.com';
 
         console.log('  ┌─────────────────────────────────────────┐');
-        console.log('  │         🦞 ClawMiner 挖矿状态          │');
+        console.log('  │         🦞 MingXia 挖矿状态           │');
         console.log('  ├─────────────────────────────────────────┤');
         console.log(`  │  钱包：     ${this.address.substring(0, 6)}...${this.address.substring(38)}`);
         console.log(`  │  网络：     BSC ${CONFIG.NETWORK}`);
-        console.log(`  │  余额：     ${formatNumber(status.balance)} CLAWMINER`);
+        console.log(`  │  MXIA余额： ${formatNumber(status.balance)} MXIA`);
+        console.log(`  │  CLAW余额： ${formatNumber(status.clawBalance)} CLAW`);
         console.log('  ├─────────────────────────────────────────┤');
-        console.log(`  │  难度：     ${status.difficulty} 字节`);
-        console.log(`  │  奖励：     ${status.reward} CLAWMINER / 次`);
-        console.log(`  │  进度：     ${status.progress}`);
-        console.log(`  │  剩余可挖： ${formatNumber(status.remaining)} CLAWMINER`);
+        console.log(`  │  全网进度： ${status.progress}`);
+        console.log(`  │  剩余可挖： ${formatNumber(status.remainingSupply)} MXIA`);
+        console.log(`  │  您的参与： ${status.userMinesCount} / ${status.maxMines} 次 (上限)`);
         console.log('  ├─────────────────────────────────────────┤');
-
-        if (status.cooldownRemaining > 0) {
-            console.log(`  │  冷却：     ⏱️  还需 ${formatTime(status.cooldownRemaining)}`);
+        
+        if (status.isBurned) {
+             console.log(`  │  倒计时：   🔥 挖矿已结束，剩余代币已销毁！`);
+        } else if (status.timeLeft > 0) {
+             console.log(`  │  倒计时：   ⏱️ 还剩 ${formatTime(status.timeLeft)}`);
         } else {
-            console.log(`  │  冷却：     ✅ 可以挖矿！`);
+             console.log(`  │  倒计时：   ⚠️ 窗口已关闭（等待销毁）`);
         }
-
         console.log('  └─────────────────────────────────────────┘');
         console.log(`\n  🔍 ${explorerBase}/address/${this.address}\n`);
 
         return status;
     }
 
-    /**
-     * Check if mining is possible
-     */
-    async canMine() {
-        const cooldown = await this.contract.cooldownRemaining(this.address);
-        return {
-            canMine: cooldown === 0n,
-            remaining: Number(cooldown)
-        };
-    }
-
-    /**
-     * Find a valid PoW proof
-     */
-    async findProof(blockNumber, timestamp, difficulty) {
-        const targetHexChars = difficulty * 2;
+    async findProof(userNonce) {
         const startTime = Date.now();
-
         let nonce = 0;
 
         for (let i = 0; i < CONFIG.MAX_ATTEMPTS; i++) {
             const hash = ethers.solidityPackedKeccak256(
-                ['uint256', 'uint256', 'address', 'uint256'],
-                [blockNumber, timestamp, this.address, nonce]
+                ['address', 'uint256', 'uint256'],
+                [this.address, userNonce, nonce]
             );
 
-            const prefix = hash.substring(2, 2 + targetHexChars);
-            const allZeros = prefix.split('').every(c => c === '0');
-
-            if (allZeros) {
+            // Difficulty: 2 bytes (4 hex chars)
+            const prefix = hash.substring(2, 6);
+            
+            if (prefix === '0000') {
                 return {
                     success: true,
                     proof: hash,
@@ -179,11 +188,7 @@ class ClawMinerAgent {
             }
 
             nonce++;
-
-            // Progress report every 100k attempts
-            if (i % 100000 === 0 && i > 0) {
-                log('⛏️', `正在计算 PoW... 已尝试 ${formatNumber(i)} 次（${Math.floor((Date.now() - startTime) / 1000)}秒）`);
-            }
+            // Scrolling logs removed completely to prevent LLM token waste
         }
 
         return {
@@ -193,133 +198,121 @@ class ClawMinerAgent {
         };
     }
 
-    /**
-     * Execute single mine
-     */
+    async checkCLAW(status, force = false) {
+        if (Number(status.clawBalance) === 0) {
+            log('⚠️', '未持有 $CLAW 门票！');
+            if (force) {
+                log('🚨', '警告：你开启了 --force 强制模式，将无视前端检查直接向合约发起硬刚挑战！');
+                return true;
+            }
+            if (CONFIG.NETWORK === 'testnet') {
+                log('🛑', '由于你没有 $CLAW，前端已拦截挖矿。');
+                log('💡', '测试网用户：请运行 `npx clawminer-skill faucet` 或 `node scripts/mine.js --faucet` 领取测试门票后再挖。');
+            } else {
+                log('🛑', '主网用户：请先在去中心化交易所购买真实的 $CLAW 代币放入钱包后重试。');
+            }
+            return false;
+        }
+        return true;
+    }
+
+    async runFaucet() {
+        const status = await this.getStatus();
+        if (CONFIG.NETWORK !== 'testnet') {
+            log('❌', '只有测试网才可以免费领水！');
+            return;
+        }
+        if (Number(status.clawBalance) > 0) {
+             log('✅', `你已经有 ${formatNumber(status.clawBalance)} TestCLAW 了，不需要再领跑啦，快去挖矿吧！`);
+             return;
+        }
+        
+        log('🛠️', '正在为你向测试网合约申请免费 TestCLAW 门票...');
+        const clawToken = new ethers.Contract(status.clawTokenAddr, ERC20_ABI, this.wallet);
+        try {
+            const tx = await clawToken.faucet();
+            log('⏳', `等待领水交易上链确认... (${tx.hash})`);
+            await tx.wait();
+            log('🌟', 'TestCLAW 领取成功！你现在可以运行 `npx clawminer-skill loop` 疯狂挖矿了！');
+        } catch (e) {
+            log('❌', `领水失败: ${e.message}`);
+        }
+    }
+
     async mine(dryRun = false) {
-        log('🦞', 'ClawMiner — 开始挖矿\n');
+        log('🦞', 'MingXia — 准备挖矿\n');
 
-        // 1. Check cooldown
-        log('⏱️', '检查冷却状态...');
-        const canMineResult = await this.canMine();
-
-        if (!canMineResult.canMine) {
-            log('⏱️', `冷却中 — 还需 ${formatTime(canMineResult.remaining)}`);
-            return {
-                status: 'cooling',
-                remaining: canMineResult.remaining,
-                message: `冷却中，还需 ${formatTime(canMineResult.remaining)}`
-            };
+        const status = await this.getStatus();
+        
+        if (status.isBurned || status.timeLeft === 0) {
+             return { status: 'ended', message: '⚠️ 挖矿时间窗口已结束！' };
         }
 
-        // 2. Get current state
-        const status = await this.getStatus();
-        log('📊', `难度：${status.difficulty} | 奖励：${status.reward} CLAWMINER | 进度：${status.progress}`);
+        if (status.userMinesCount >= status.maxMines) {
+             return { status: 'exhausted', message: `✅ 恭喜！您已达到单人最大挖矿上限（${status.maxMines}次）。` };
+        }
 
-        // 3. Get block info
-        const [blockNumber, block] = await Promise.all([
-            this.provider.getBlockNumber(),
-            this.provider.getBlock()
-        ]);
-        const timestamp = block.timestamp;
-        log('🔗', `区块：${blockNumber} | 时间戳：${timestamp}`);
+        if (Number(status.remainingSupply) <= 0) {
+             return { status: 'ended', message: '⚠️ 2100万 MXIA 已全网挖完！' };
+        }
 
-        // 4. Find proof
-        log('⛏️', '正在计算 PoW 证明...');
-        const proofResult = await this.findProof(blockNumber, Number(timestamp), status.difficulty);
+        // Check CLAW holding requirement
+        const forceMode = process.argv.includes('--force');
+        const hasClaw = await this.checkCLAW(status, forceMode);
+        if (!hasClaw) {
+            return { status: 'failed', message: '无 $CLAW 在钱包内，挖矿被拦截。' };
+        }
+
+        const userNonce = await this.contract.userNonce(this.address);
+        log('⛏️', '开始为您自动计算 PoW 证明 (这可能需要几秒钟)...');
+        
+        const proofResult = await this.findProof(userNonce);
 
         if (!proofResult.success) {
-            log('❌', `尝试 ${formatNumber(proofResult.attempts)} 次后未找到有效解（${Math.floor(proofResult.elapsed / 1000)}秒）`);
             return {
                 status: 'failed',
-                message: `尝试 ${formatNumber(proofResult.attempts)} 次未找到有效 Proof`,
-                attempts: proofResult.attempts,
-                elapsed: proofResult.elapsed
+                message: `尝试 ${formatNumber(proofResult.attempts)} 次未找到有效 Proof`
             };
         }
 
-        log('✅', `找到有效 Proof！尝试：${formatNumber(proofResult.attempts)} 次 | 耗时：${Math.floor(proofResult.elapsed / 1000)}秒`);
-        log('🔑', `Hash: ${proofResult.proof.substring(0, 22)}...`);
+        log('✅', `计算完成！尝试：${formatNumber(proofResult.attempts)} 次 | 耗时：${Math.floor(proofResult.elapsed)}ms  (Nonce: ${proofResult.nonce})`);
 
-        // Dry run stops here
         if (dryRun) {
-            log('🧪', '模拟运行 — 跳过交易提交');
-            return {
-                status: 'dry-run',
-                proof: proofResult.proof,
-                nonce: proofResult.nonce,
-                attempts: proofResult.attempts,
-                elapsed: proofResult.elapsed,
-                message: '模拟运行完成 — Proof 有效'
-            };
+            return { status: 'dry-run', message: '模拟运行完成 — Proof 有效' };
         }
 
-        // 5. Estimate gas
-        log('📤', '准备提交交易...');
+        log('📤', '提交交易...');
         let gasLimit = CONFIG.GAS_LIMIT;
 
         try {
-            const estimate = await this.contract.mine.estimateGas(
-                proofResult.proof, blockNumber, timestamp
-            );
+            const estimate = await this.contract.mine.estimateGas(proofResult.nonce);
             gasLimit = Math.floor(Number(estimate) * (1 + CONFIG.GAS_BUFFER_PERCENT / 100));
-            log('⛽', `Gas 估算：${estimate} → ${gasLimit}（含缓冲）`);
         } catch (e) {
             log('⛽', `Gas 估算失败，使用默认值：${gasLimit}`);
         }
 
-        // 6. Submit transaction
         try {
-            const tx = await this.contract.mine(
-                proofResult.proof, blockNumber, timestamp,
-                { gasLimit }
-            );
-
+            const tx = await this.contract.mine(proofResult.nonce, { gasLimit });
             log('📤', `交易哈希：${tx.hash}`);
-            log('⏳', '等待链上确认...');
-
             const receipt = await tx.wait();
-            const explorerBase = CONFIG.NETWORK === 'mainnet'
-                ? 'https://bscscan.com'
-                : 'https://testnet.bscscan.com';
 
             if (receipt.status === 1) {
-                const balance = await this.contract.balanceOf(this.address);
-
-                log('🎉', `挖矿成功！获得 ${status.reward} CLAWMINER`);
-                log('💰', `总余额：${ethers.formatEther(balance)} CLAWMINER`);
-                log('🔍', `${explorerBase}/tx/${tx.hash}`);
-
-                return {
-                    status: 'success',
-                    txHash: tx.hash,
-                    gasUsed: Number(receipt.gasUsed),
-                    reward: status.reward,
-                    balance: ethers.formatEther(balance),
-                    proof: proofResult.proof,
-                    attempts: proofResult.attempts,
-                    message: `挖矿成功！获得 ${status.reward} CLAWMINER`
-                };
+                log('🎉', `挖矿成功！获得 ${status.reward} MXIA (进度: ${status.userMinesCount + 1}/${status.maxMines})`);
+                return { status: 'success', txHash: tx.hash, message: '挖矿成功！' };
             } else {
-                log('❌', `交易失败 (status=0)`);
                 return { status: 'failed', txHash: tx.hash, message: '交易被回滚' };
             }
         } catch (error) {
-            if (error.message.includes('Cooldown')) {
-                log('⏱️', '冷却中 — 请稍后重试');
-                return { status: 'cooling', message: '冷却中，请稍后重试' };
+            if (error.message.includes("difficulty too low")) {
+                return { status: 'retry', message: 'Proof无效或被抢跑，正在重试' };
             }
-            if (error.message.includes('Proof already used')) {
-                log('⚠️', 'Proof 已被使用 — 将使用新的 Proof 重试');
-                return { status: 'retry', message: 'Proof 已被使用' };
+            if (error.message.includes("Must hold CLAW")) {
+                return { status: 'failed', message: '🛑 智能合约直接拒绝：Must hold CLAW to mine (必须持有CLAW)' };
             }
             throw error;
         }
     }
 
-    /**
-     * Mine with retry
-     */
     async mineWithRetry(dryRun = false) {
         let retryCount = 0;
 
@@ -327,89 +320,64 @@ class ClawMinerAgent {
             try {
                 const result = await this.mine(dryRun);
 
-                if (result.status === 'success' || result.status === 'cooling' || result.status === 'dry-run') {
+                if (['success', 'dry-run', 'ended', 'exhausted'].includes(result.status)) {
                     return result;
                 }
 
                 retryCount++;
                 if (retryCount > CONFIG.MAX_RETRY) {
-                    log('❌', `已达最大重试次数 (${CONFIG.MAX_RETRY})`);
-                    return { status: 'exhausted', message: `重试 ${CONFIG.MAX_RETRY} 次后仍失败` };
+                    return { status: 'error', message: `重试 ${CONFIG.MAX_RETRY} 次后仍失败` };
                 }
 
-                log('🔄', `${CONFIG.RETRY_DELAY_MS / 1000}秒后重试 (${retryCount}/${CONFIG.MAX_RETRY})...`);
+                log('🔄', `${CONFIG.RETRY_DELAY_MS / 1000}秒后重试...`);
                 await new Promise(r => setTimeout(r, CONFIG.RETRY_DELAY_MS));
 
             } catch (error) {
                 retryCount++;
-                if (retryCount > CONFIG.MAX_RETRY) {
-                    log('❌', `Error: ${error.message}`);
-                    return { status: 'error', message: error.message };
-                }
                 log('⚠️', `错误：${error.message}`);
-                log('🔄', `${CONFIG.RETRY_DELAY_MS / 1000}秒后重试 (${retryCount}/${CONFIG.MAX_RETRY})...`);
                 await new Promise(r => setTimeout(r, CONFIG.RETRY_DELAY_MS));
             }
         }
     }
 
-    /**
-     * Continuous mining loop
-     */
     async loop() {
-        log('🔁', '启动连续挖矿循环（按 Ctrl+C 停止）\n');
-        let mineCount = 0;
+        log('🔁', '启动疯狂连续挖矿模式（按 Ctrl+C 停止）\n');
 
         while (true) {
-            mineCount++;
-            log('🔁', `\n${'='.repeat(50)}`);
-            log('🔁', `第 ${mineCount} 轮挖矿`);
-            log('🔁', `${'='.repeat(50)}\n`);
+            const status = await this.getStatus();
+            if (status.timeLeft < 600 && status.timeLeft > 0) { // Last 10 minutes
+                CONFIG.RETRY_DELAY_MS = 500; // Speed up
+                log('🔥', '倒计时不足 10 分钟，进入加速抢矿状态！');
+            }
 
             const result = await this.mineWithRetry();
 
-            if (result.status === 'cooling') {
-                const waitTime = result.remaining || CONFIG.COOLDOWN_SECONDS;
-                log('⏱️', `等待冷却 ${formatTime(waitTime)}...\n`);
+            if (result.status === 'ended' || result.status === 'exhausted') {
+                log('🛑', result.message);
+                break;
+            }
 
-                // Countdown display
-                let remaining = waitTime;
-                while (remaining > 0) {
-                    process.stdout.write(`\r  ⏱️  冷却中：还需 ${formatTime(remaining)}...  `);
-                    await new Promise(r => setTimeout(r, 10000)); // Update every 10s
-                    remaining -= 10;
-                }
-                console.log('\n');
-            } else if (result.status === 'success') {
-                // Wait for cooldown after successful mine
-                log('⏱️', `等待冷却 ${formatTime(CONFIG.COOLDOWN_SECONDS)}...\n`);
-                let remaining = CONFIG.COOLDOWN_SECONDS;
-                while (remaining > 0) {
-                    process.stdout.write(`\r  ⏱️  冷却中：还需 ${formatTime(remaining)}...  `);
-                    await new Promise(r => setTimeout(r, 10000));
-                    remaining -= 10;
-                }
-                console.log('\n');
+            if (result.status === 'success') {
+                log('⚡', `🦞 正在为您持续挂机挖矿中... 准备抢占下一个区块！\n`);
             } else {
-                // On error, wait a bit before retrying
-                log('⚠️', '30秒后重新尝试...');
-                await new Promise(r => setTimeout(r, 30000));
+                await new Promise(r => setTimeout(r, 2000));
             }
         }
     }
 }
 
-// ========== CLI Entry Point ==========
 async function main() {
     const args = process.argv.slice(2);
-    const agent = new ClawMinerAgent();
+    const agent = new MingXiaAgent();
 
-    console.log('\n  🦞 ClawMiner Skill v1.0.0');
+    console.log('\n  🦞 MingXia Skill v1.0.0');
     console.log(`  📍 网络：BSC ${CONFIG.NETWORK}`);
     console.log(`  👛 钱包：${agent.address}\n`);
 
     if (args.includes('--status')) {
         await agent.showStatus();
+    } else if (args.includes('--faucet')) {
+        await agent.runFaucet();
     } else if (args.includes('--loop')) {
         await agent.loop();
     } else if (args.includes('--dry-run')) {
@@ -419,12 +387,6 @@ async function main() {
         console.log('\n' + '─'.repeat(50));
         console.log(`  结果：${result.status}`);
         console.log(`  ${result.message}`);
-        if (result.txHash) {
-            const explorerBase = CONFIG.NETWORK === 'mainnet'
-                ? 'https://bscscan.com'
-                : 'https://testnet.bscscan.com';
-            console.log(`  🔍 ${explorerBase}/tx/${result.txHash}`);
-        }
         console.log('─'.repeat(50) + '\n');
     }
 }

@@ -1,7 +1,7 @@
 {
   "name": "clawminer-skill",
   "version": "1.0.0",
-  "description": "ClawMiner PoW Mining Skill for OpenClaw Agent",
+  "description": "MingXia ($MXIA) PoW Mining Skill — 4-Hour Death Match on BSC",
   "main": "scripts/mine.js",
   "bin": {
     "clawminer-skill": "bin/cli.js"
@@ -16,7 +16,8 @@
   "scripts": {
     "mine": "node scripts/mine.js",
     "status": "node scripts/mine.js --status",
-    "loop": "node scripts/mine.js --loop"
+    "loop": "node scripts/mine.js --loop",
+    "faucet": "node scripts/mine.js --faucet"
   },
   "keywords": [
     "clawminer",

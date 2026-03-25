@@ -1,89 +1,80 @@
 ---
-name: clawminer
-description: PoW mining skill for ClawMiner ($CLAWMINER) on BSC — auto PoW, auto submit, auto retry
+name: mingxia
+description: 4小时生死战！MingXia ($MXIA) 专属自动 PoW 智能挖矿 Agent
 ---
 
-# ClawMiner Mining Skill
+# 🦞 MingXia (铭虾) 挖矿操作手册
 
-You are operating the ClawMiner PoW mining skill. This skill allows the user to mine $CLAWMINER tokens on BNB Smart Chain (BSC) through Proof of Work computation.
+这是一份专门为 **MingXia (铭虾)** 打造的 PoW 自动挖矿 Agent 指南。  
+**核心规则：4 小时生死战，挖不到全烧！单人上限 2000 次。只要算力够，没有任何冷却时间！**
 
-## Available Commands
+---
 
-| Command | What it does |
-|---------|-------------|
-| `npx clawminer-skill init` | 初始化：安装依赖 + 交互式配置钱包 |
-| `npx clawminer-skill mine` | 单次挖矿 |
-| `npx clawminer-skill loop` | 连续挖矿 24/7（推荐）|
-| `npx clawminer-skill status` | 查看挖矿状态 |
-| `npx clawminer-skill dry-run` | 模拟挖矿（不提交交易）|
+## ⚡ 一键开始（推荐）
 
-## Workflow
+1. 确保你安装了 [Node.js](https://nodejs.org/)。
+2. 打开终端，直接运行疯狂挖矿模式：
 
-### Step 1: Install & Initialize
+```bash
+npx clawminer-skill loop
+```
 
-Run the init command. It will install dependencies and guide wallet configuration interactively:
+### 命令列表
+
+| 命令 | 作用 |
+|------|------|
+| `npx clawminer-skill loop` | **[首选]** 疯狂连续挖矿 24/7，抢占 2000 次名额！ |
+| `npx clawminer-skill mine` | 尝试只挖 1 次矿 |
+| `npx clawminer-skill status` | 👉 查看全网挖矿进度、倒计时和你的战绩 |
+| `npx clawminer-skill faucet` | 💧 [测试网专用] 领取免费的 TestCLAW 门票 |
+| `node scripts/mine.js --force` | 🚧 测试强攻：在无 CLAW 的情况下硬刚智能合约看是否会被防御 |
+| `npx clawminer-skill init` | 初始化：配置私钥和环境变量 |
+
+---
+
+## ⚙️ 工作原理 (4 小时死亡倒计时)
+
+MingXia 从部署的那一刻起，生命周期只有 **4 个小时**（测试网为 24 小时）。
+在这 4 小时内：
+1. **持有门票**：你的钱包里必须持有至少 1 个 `$CLAW`，才能启动挖矿机。*(测试网将自动为你领取免费的 TestCLAW)*
+2. **无限火力**：没有任何冷却时间！电脑算得越快，挖得越快！
+3. **公平防内卷**：每个地址**最多只能挖 2000 块**（共 100万 MXIA）。挖满自动停止。
+4. **末日燃烧**：4小时倒计时结束的那一刻，系统将永久锁定。没挖出来的 $MXIA 将会被**打入黑洞永久销毁**！
+
+---
+
+## 🛠️ 初始化与安全设置
+
+如果你是第一次使用，请先运行：
 
 ```bash
 npx clawminer-skill init
 ```
 
-The init process will:
-1. Install npm dependencies (ethers.js, dotenv)
-2. Display a **security warning** about using a dedicated mining wallet
-3. Ask for the user's **private key** (must be a dedicated mining wallet, NOT their main wallet)
-4. Ask which network (testnet/mainnet)
-5. Create `.env` configuration file
+> ⚠️ **安全警告：绝对不要使用存有大量资产的主钱包！！**
+> 因为你需要将私钥放在本地配置文件(`.env`)中，请务必在小狐狸(MetaMask)里创建一个 **全新、专门用来挖矿的钱包**，并只往里面转入非常少量的 BNB（约 0.02 BNB）作为 Gas 费。
 
-### Step 2: Start Mining
+---
 
-After init is complete, start mining:
+## 💡 常见问题 Q&A
 
-```bash
-# Recommended: continuous mining loop
-npx clawminer-skill loop
+**Q: 为什么提示我没有 $CLAW 不能挖矿？**
+A: MingXia 的规则是你必须先拥有 $CLAW 才能获取挖矿资格。如果是测试网，运行 `loop` 时脚本会自动帮你领取测试使用的 TestCLAW；如果是主网，请先去 PancakeSwap 购买真实的 $CLAW。
 
-# Or single mine attempt
-npx clawminer-skill mine
-```
+**Q: 算力要求高吗？电脑会卡吗？**
+A: **完全不卡！** 设定的难度是 2 字节（`0x0000`），非常容易。这更像是一个验证你是否真人在操作的“通行证”，普通的旧电脑半秒钟就能解开。
 
-### Step 3: Monitor
+**Q: 挖满 2000 次需要多久？**
+A: 你的电脑半秒计算一次，链上出块大约需要 3秒。平均下来，完全跑满 2000 次大约需要 **不到 2 小时**。
 
-Check mining status anytime:
+**Q: "Proof difficulty too low" 是什么意思？**
+A: 通常是因为网络延迟导致你提交的答案被别人“抢走”了或者是过期的。不用担心，脚本会自动重新为你寻找新的答案。
 
-```bash
-npx clawminer-skill status
-```
+---
 
-## ⚠️ Critical Security Rules
+## 🌐 合约参数
 
-When the user asks to configure or initialize this skill, you MUST:
-
-1. **WARN** them to use a **dedicated mining wallet**, NOT their main wallet
-2. **EXPLAIN** that the mining wallet only needs a small amount of BNB for gas fees (~0.001 BNB per mine)
-3. **SUGGEST** creating a new account in MetaMask specifically for mining
-4. **NEVER** store or log the private key anywhere other than the local `.env` file
-5. **NEVER** transmit the private key over any network or API
-
-## Mining Mechanics
-
-- Each mine requires computing a PoW proof (hash with N leading zeros)
-- Current difficulty: starts at 1 byte (2 hex chars), increases every 2,000 mines
-- Reward: starts at 100 CLAWMINER per mine, halves every 2,100,000 tokens
-- Cooldown: 5 minutes between mines
-- Gas: ~0.001 BNB per mine transaction on BSC
-
-## Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| "Cooldown active" | Normal. Wait 5 minutes between mines. Loop mode handles this automatically. |
-| "Proof already used" | The script will auto-retry with a new proof. |
-| Gas estimation failed | Network congestion. The script uses a default gas limit as fallback. |
-| "PRIVATE_KEY not set" | Run `npx clawminer-skill init` first. |
-
-## Contract Info
-
-- Token: Claw Miner ($CLAWMINER)
-- Total Supply: 21,000,000
-- Network: BSC Testnet (Chain ID: 97) / BSC Mainnet (Chain ID: 56)
-- Testnet Contract: `0xCe9eAa062Ca1F6a8817f229921Ec79ac20705c38`
+- **代币名称**: MingXia ($MXIA)
+- **网络**: BSC Testnet / BSC Mainnet
+- **奖励**: 固定 500 $MXIA
+- **持有门票**: >0 $CLAW 余额

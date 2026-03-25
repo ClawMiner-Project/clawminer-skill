@@ -370,7 +370,7 @@ async function main() {
     const args = process.argv.slice(2);
     const agent = new MingXiaAgent();
 
-    console.log('\n  🦞 MingXia Skill v1.0.0');
+    console.log('\n  🦞 MingXia Skill v1.1.0');
     console.log(`  📍 网络：BSC ${CONFIG.NETWORK}`);
     console.log(`  👛 钱包：${agent.address}\n`);
 

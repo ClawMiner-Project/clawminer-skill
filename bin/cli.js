@@ -161,7 +161,7 @@ switch (command) {
         break;
     default:
         console.log(`
-  🦞 MingXia Skill v1.0.0
+  🦞 MingXia Skill v1.1.0
 
   命令：
     npx clawminer-skill init       初始化配置（首次使用）

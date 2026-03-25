@@ -1,6 +1,6 @@
 {
   "name": "clawminer-skill",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "MingXia ($MXIA) PoW Mining Skill — 4-Hour Death Match on BSC",
   "main": "scripts/mine.js",
   "bin": {

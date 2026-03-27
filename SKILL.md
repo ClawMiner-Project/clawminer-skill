@@ -45,12 +45,12 @@ clawminer-skill loop
 
 ## ⚙️ 工作原理 (4 小时死亡倒计时)
 
-MingXia 从部署的那一刻起，生命周期只有 **4 个小时**（测试网为 24 小时）。
+MingXia 从部署的那一刻起，生命周期只有 **4 个小时**（测试网同样为 4 小时）。
 在这 4 小时内：
 1. **持有门票**：你的钱包里必须持有至少 1 个 `$CLAW`，才能启动挖矿机。**必须由用户手动领取，禁止自动领取！**
 2. **无限火力**：没有任何冷却时间！电脑算得越快，挖得越快！
 3. **公平防内卷**：每个地址**最多只能挖 2000 块**（共 100万 MXIA）。挖满自动停止。
-4. **末日燃烧**：4小时倒计时结束的那一刻，系统将永久锁定。没挖出来的 $MXIA 将会被**打入黑洞永久销毁**！
+4. **末日燃烧**：4小时倒计时结束的那一刻，任何人都可以调用销毁函数，将没挖出来的 $MXIA **打入黑洞永久销毁**！时间锁保证在4小时内无人可提前触发。
 
 ---
 
@@ -87,7 +87,7 @@ INSTALL_DIR=$(npm prefix -g)/lib/node_modules/clawminer-skill
 cat > "$INSTALL_DIR/.env" << 'EOF'
 PRIVATE_KEY=用户提供的私钥
 RPC_URL=https://bsc-testnet.publicnode.com
-CONTRACT_ADDRESS=0x3a74292B73CBB4dCfdf9cAA85CF88c41d7992410
+CONTRACT_ADDRESS=0x2cf1e03fE395899E7366CaA7Ac35c445C801eBca
 NETWORK=testnet
 EOF
 ```
